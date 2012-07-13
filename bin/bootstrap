@@ -18,15 +18,39 @@ export LC_ALL="POSIX"
 export PATH=$HOME/bin:/usr/local/bin:/bin:/usr/bin
 
 TARGET="arm-linux-gnueabi"
-COMMON_FLAGS="--target=$TARGET --disable-nls"
 BOOTSTRAP=$PWD
 
+SRC="$BOOTSTRAP/src"
+BLD="$BOOTSTRAP/bld"
+TAR="$BOOTSTRAP/tar"
+PRG="$BOOTSTRAP/prg"
+
+COMMON_FLAGS="--target=$TARGET \
+	--disable-nls \
+	--disable-multilib \
+	--config-cache
+"
+
 is_done() {
-	if [[ -f $BOOTSTRAP/prg/$1.done ]]; then
+	if [[ -f $PRG/$1.done ]]; then
+		echo $1 done skipping.
 		return 0;
 	else
 		return 1;
 	fi
+}
+
+mk_build_dir() {
+	[[ -d $BLD/$1 ]] && return 0
+	mkdir "$BLD/$1"
+}
+
+stage() {
+	d="$1-$2"
+	[[ -d $SRC/$d ]] && return 0
+	echo staging $1-$2
+	tar xf $TAR/$d.$3 -C "$SRC"
+	return 0
 }
 
 cross_binutils() {
@@ -37,20 +61,51 @@ cross_binutils() {
 	is_done $FUNCNAME && return 0
 
 	stage $n $v $e 
-	[[ ! -d blds/$FUNCNAME ]] && mkdir blds/$FUNCNAME
-	cd blds/$FUNCNAME
-	$BOOTSTRAP/src/$n-$v/configure $COMMON_FLAGS
-	make
-	make install
-	touch "$BOOTSTRAP/prg/$FUNCNAME.done"
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd $BLD/$FUNCNAME
+		$SRC/$n-$v/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
 }
 
-stage() {
-	d="$1-$2"
-	[[ -d src/$d ]] && return 0
-	echo staging $1-$2
-	tar xf tars/$d.$3 -C $BOOTSTRAP/src
-	return 0
+cross_gcc() {
+	local n="gcc"
+	local v="4.7.1"
+	local e="tar.bz2"
+	local flags="--disable-decimal-float \
+		--disable-threads \
+		--with-newlib \
+		--without-headers \
+		--disable-libmudflap \
+		--disable-libssp \
+		--disable-libgomp \
+		--disable-libquadmath \
+		--disable-target-libiberty  \
+		--disable-target-zlib \
+		--without-ppl \
+		--without-cloog \
+		--disable-shared \
+		--enable-languages=c
+"
+	is_done $FUNCNAME && return 0
+
+	stage $n $v $e 
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd $BLD/$FUNCNAME
+		$SRC/$n-$v/configure $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
 }
 
+cross_glibc() {
+}
 cross_binutils
+cross_gcc

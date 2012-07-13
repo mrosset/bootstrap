@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -ehu
+
+pwd=$PWD
+user=$USER
+term=$TERM
+home=$HOME
+
+unset `env | awk -F= '/^\w/ {print $1}' | xargs`
+
+# Exports
+export HOME=$home
+export PWD=$pwd
+export USER=$user
+export TERM=$term
+export LC_ALL="POSIX"
+export PATH=$HOME/bin:/usr/local/bin:/bin:/usr/bin
+
+TARGET="arm-linux-gnueabi"
+COMMON_FLAGS="--target=$TARGET --disable-nls"
+BOOTSTRAP=$PWD
+
+is_done() {
+	if [[ -f $BOOTSTRAP/prg/$1.done ]]; then
+		return 0;
+	else
+		return 1;
+	fi
+}
+
+cross_binutils() {
+	local n="binutils"
+	local v="2.22"
+	local e="tar.gz"
+
+	is_done $FUNCNAME && return 0
+
+	stage $n $v $e 
+	[[ ! -d blds/$FUNCNAME ]] && mkdir blds/$FUNCNAME
+	cd blds/$FUNCNAME
+	$BOOTSTRAP/src/$n-$v/configure $COMMON_FLAGS
+	make
+	make install
+	touch "$BOOTSTRAP/prg/$FUNCNAME.done"
+}
+
+stage() {
+	d="$1-$2"
+	[[ -d src/$d ]] && return 0
+	echo staging $1-$2
+	tar xf tars/$d.$3 -C $BOOTSTRAP/src
+	return 0
+}
+
+cross_binutils

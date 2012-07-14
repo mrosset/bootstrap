@@ -15,10 +15,10 @@ export PWD=$pwd
 export USER=$user
 export TERM=$term
 export LC_ALL="POSIX"
-export PATH=$HOME/bin:/usr/local/bin:/bin:/usr/bin
-export MAKEFLAGS="-j4 -sw"
+export PATH=$HOME/bin:/opt/tools/bin:/bin:/bin:/usr/bin
+export MAKEFLAGS="-j4 -s -e -w"
 TARGET="arm-linux-gnueabi"
-PREFIX="/opt/$TARGET/"
+PREFIX="/opt/tools/"
 BOOTSTRAP=$PWD
 
 SRC="$BOOTSTRAP/src"
@@ -59,7 +59,7 @@ cross_binutils() {
 	local n="binutils"
 	local v="2.22"
 	local e="tar.gz"
-	local flags="--enable-shared"
+	local flags="--enable-shared --prefix=$PREFIX"
 
 	is_done $FUNCNAME && return 0
 
@@ -94,6 +94,7 @@ cross_gcc() {
 		--without-ppl \
 		--without-cloog \
 		--with-newlib \
+		--prefix=$PREFIX \
 		--enable-languages=c"
 
 
@@ -125,16 +126,14 @@ api_headers() {
 	pushd $SRC/$n-$v
 		make mrproper
 		make ARCH=arm headers_check
-		make ARCH=arm INSTALL_HDR_PATH=dest headers_install
-
-		mkdir -p /usr/local/$TARGET/sys-root/usr
-		cp -a  dest/include  /usr/local/$TARGET/sys-root/usr/
+		make ARCH=arm INSTALL_HDR_PATH=/cross headers_install
 
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
-cross_glibc() {
+libc() {
+	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
 	local v="2.13"
 	local r="r13356"
@@ -145,6 +144,8 @@ cross_glibc() {
 		--with-__thread \
 		--enable-kernel=2.6.22.5 \
 		--with-tls \
+		--prefix=/cross \
+		--with-headers=/cross/include \
 		--disable-sanity-checks"
 
 	is_done $FUNCNAME && return 0
@@ -194,5 +195,5 @@ cross_gcc_final() {
 cross_binutils
 cross_gcc
 api_headers
-cross_glibc
-cross_gcc_final
+libc
+#cross_gcc_final

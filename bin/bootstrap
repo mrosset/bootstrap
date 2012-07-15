@@ -17,8 +17,15 @@ export TERM=$term
 export LC_ALL="POSIX"
 export PATH=$HOME/bin:/opt/tools/bin:/bin:/bin:/usr/bin
 export MAKEFLAGS="-j4 -s -e -w"
+
+# toolchain tweaks
+export CFLAGS="-O2 -pipe"
+
 TARGET="arm-linux-gnueabi"
 PREFIX="/opt/tools/"
+SYSROOT="/data/data/gnuoid"
+TARGET_PREFIX="/data/data/gnuoid"
+
 BOOTSTRAP=$PWD
 
 SRC="$BOOTSTRAP/src"
@@ -27,8 +34,9 @@ TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
 COMMON_FLAGS="--target=$TARGET \
+	--prefix=$PREFIX \
 	--disable-nls \
-	--with-sysroot \
+	--with-sysroot=$SYSROOT \
 	--disable-threads \
 	--disable-multilib \
 	--config-cache"
@@ -59,7 +67,6 @@ cross_binutils() {
 	local n="binutils"
 	local v="2.22"
 	local e="tar.gz"
-	local flags="--enable-shared --prefix=$PREFIX"
 
 	is_done $FUNCNAME && return 0
 
@@ -67,8 +74,8 @@ cross_binutils() {
 	mk_build_dir $FUNCNAME
 
 	# build
-	pushd $BLD/$FUNCNAME
-		$SRC/$n-$v/configure $COMMON_FLAGS $flags
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$n-$v/configure $COMMON_FLAGS
 		make configure-host
 		make
 		make install
@@ -84,6 +91,7 @@ cross_gcc() {
 		--disable-threads \
 		--disable-bootstrap \
 		--disable-libmudflap \
+		--with-native-system-header-dir=$SYSROOT/native \
 		--disable-libssp \
 		--disable-shared \
 		--disable-libgomp \
@@ -102,10 +110,9 @@ cross_gcc() {
 
 	stage $n $v $e 
 	mk_build_dir $FUNCNAME
-	#local linuxh="$SRC/$n-$v/gcc/config/linux.h"
 
 	# build
-	pushd $BLD/$FUNCNAME
+	pushd "$BLD/$FUNCNAME"
 		$SRC/$n-$v/configure $COMMON_FLAGS $flags
 		make all-gcc all-target-libgcc
 		make install-gcc install-target-libgcc
@@ -113,7 +120,7 @@ cross_gcc() {
 	popd
 }
 
-api_headers() {
+linux_headers() {
 	local n="linux"
 	local v="3.3"
 	local e="tar.xz"
@@ -123,30 +130,28 @@ api_headers() {
 	stage $n $v $e
 
 	# build
-	pushd $SRC/$n-$v
+	pushd "$SRC/$n-$v"
 		make mrproper
-		make ARCH=arm headers_check
-		make ARCH=arm INSTALL_HDR_PATH=/cross headers_install
+		make ARCH=arm CROSS_COMPILE=$TARGET- INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
 
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
-libc() {
+glibc_headers() {
 	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
 	local v="2.13"
 	local r="r13356"
 	local e="tar.bz2"
-	local flags="--host=$TARGET \
+	local flags="--prefix=/usr \
+		--host=$TARGET \
+		--with-headers=$SYSROOT/usr/include \
 		--disable-profile \
+		--without-gd \
+		--without-cvs \
 		--enable-add-ons \
-		--with-__thread \
-		--enable-kernel=2.6.22.5 \
-		--with-tls \
-		--prefix=/cross \
-		--with-headers=/cross/include \
-		--disable-sanity-checks"
+		--enable-kernel=2.6.22.5"
 
 	is_done $FUNCNAME && return 0
 
@@ -154,38 +159,103 @@ libc() {
 		stage $n $v-$r $e
 		stage $n-ports $v-$r  $e
 		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
-		sed -e 's/-lgcc_eh//g' -i "$SRC/$n-$v/Makeconfig"
 	fi
 
 	mk_build_dir $FUNCNAME
 	# build
-	pushd $BLD/$FUNCNAME
+	pushd "$BLD/$FUNCNAME"
 		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
-		make install-headers || true
-		make
-		make install
+		make install-headers install_root=$SYSROOT install-bootstrap-headers=yes
+
+		make csu/subdir_lib
+		mkdir -p $SYSROOT/usr/lib
+		cp csu/crt1.o csu/crti.o csu/crtn.o $SYSROOT/usr/lib
+
+		$TARGET-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
+			-o "$SYSROOT/usr/lib/libc.so"
+
 		touch "$PRG/$FUNCNAME.done"
 	popd
 
 }
 
-cross_gcc_final() {
+stage2_gcc() {
 	local n="gcc"
 	local v="4.7.1"
 	local e="tar.bz2"
-	local flags="--enable-languages=c \
-		--enable-shared \
-		--enable-threads=posix"
+	local flags="--disable-libssp \
+		--disable-libquadmath \
+		--disable-libmudflap \
+		--disable-libgomp \
+		--enable-languages=c" 
 
 	is_done $FUNCNAME && return 0
 
 	stage $n $v $e 
 	mk_build_dir $FUNCNAME
-	#local linuxh="$SRC/$n-$v/gcc/config/linux.h"
 
 	# build
-	pushd $BLD/$FUNCNAME
-		$SRC/$n-$v/configure $COMMON_FLAGS $flags
+	pushd "$BLD/$FUNCNAME"
+		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+glibc_final() {
+	export MAKEFLAGS="-j4 -s -w"
+	local n="eglibc"
+	local v="2.13"
+	local r="r13356"
+	local e="tar.bz2"
+	local flags="--prefix=/usr \
+		--host=$TARGET \
+		--with-headers=$SYSROOT/usr/include \
+		--disable-profile \
+		--without-gd \
+		--without-cvs \
+		--enable-add-ons \
+		--enable-kernel=2.6.22.5"
+
+	is_done $FUNCNAME && return 0
+
+	if [[ ! -d $SRC/$n-$v ]]; then
+		stage $n $v-$r $e
+		stage $n-ports $v-$r  $e
+		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
+	fi
+
+	mk_build_dir $FUNCNAME
+	# build
+	pushd "$BLD/$FUNCNAME"
+		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		make 
+		make install install_root=$SYSROOT
+		touch "$PRG/$FUNCNAME.done"
+	popd
+
+}
+
+final_gcc() {
+	local n="gcc"
+	local v="4.7.1"
+	local e="tar.bz2"
+	local flags="--disable-libssp \
+		--disable-libquadmath \
+		--disable-libgomp \
+		--disable-libmudflap \
+		--enable-__cxa_atexit \
+		--enable-languages=c,c++,go" 
+
+	is_done $FUNCNAME && return 0
+
+	stage $n $v $e 
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -194,6 +264,8 @@ cross_gcc_final() {
 
 cross_binutils
 cross_gcc
-api_headers
-libc
-#cross_gcc_final
+linux_headers
+glibc_headers
+stage2_gcc
+glibc_final
+final_gcc

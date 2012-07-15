@@ -1,5 +1,4 @@
 #!/bin/bash
 
-rm -rf /usr/local/*
 rm -rf bld/*
 rm -rf prg/*

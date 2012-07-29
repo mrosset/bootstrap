@@ -37,9 +37,9 @@ COMMON_FLAGS="--target=$TARGET \
 	--prefix=$PREFIX \
 	--disable-nls \
 	--with-sysroot=$SYSROOT \
-	--disable-threads \
 	--disable-multilib \
-	--config-cache"
+	--enable-threads \
+	--config-cache -q"
 
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
@@ -67,7 +67,6 @@ cross_binutils() {
 	local n="binutils"
 	local v="2.22"
 	local e="tar.gz"
-
 	is_done $FUNCNAME && return 0
 
 	stage $n $v $e 
@@ -91,7 +90,7 @@ cross_gcc() {
 		--disable-threads \
 		--disable-bootstrap \
 		--disable-libmudflap \
-		--with-native-system-header-dir=$SYSROOT/native \
+		--with-native-system-header-dir=$SYSROOT \
 		--disable-libssp \
 		--disable-shared \
 		--disable-libgomp \
@@ -122,7 +121,7 @@ cross_gcc() {
 
 linux_headers() {
 	local n="linux"
-	local v="3.3"
+	local v="2.6.39"
 	local e="tar.xz"
 
 	is_done $FUNCNAME && return 0
@@ -151,7 +150,7 @@ glibc_headers() {
 		--without-gd \
 		--without-cvs \
 		--enable-add-ons \
-		--enable-kernel=2.6.22.5"
+		--enable-kernel=2.6.39"
 
 	is_done $FUNCNAME && return 0
 
@@ -203,7 +202,7 @@ stage2_gcc() {
 	popd
 }
 
-glibc_final() {
+final_glibc() {
 	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
 	local v="2.13"
@@ -216,7 +215,7 @@ glibc_final() {
 		--without-gd \
 		--without-cvs \
 		--enable-add-ons \
-		--enable-kernel=2.6.22.5"
+		--enable-kernel=2.6.39"
 
 	is_done $FUNCNAME && return 0
 
@@ -244,6 +243,7 @@ final_gcc() {
 	local flags="--disable-libssp \
 		--disable-libquadmath \
 		--disable-libgomp \
+		--enable-threads=posix \
 		--disable-libmudflap \
 		--enable-__cxa_atexit \
 		--enable-languages=c,c++,go" 
@@ -267,5 +267,5 @@ cross_gcc
 linux_headers
 glibc_headers
 stage2_gcc
-glibc_final
+final_glibc
 final_gcc

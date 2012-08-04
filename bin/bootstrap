@@ -245,7 +245,7 @@ final_gcc() {
 		--disable-libgomp \
 		--enable-threads=posix \
 		--with-arch=armv7-a \
-		--with-fpu=vfpv3-d16
+		--with-fpu=vfpv3-d16 \
 		--disable-libmudflap \
 		--enable-__cxa_atexit \
 		--enable-languages=c,c++,go" 

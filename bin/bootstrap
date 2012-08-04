@@ -16,15 +16,14 @@ export USER=$user
 export TERM=$term
 export LC_ALL="POSIX"
 export PATH=$HOME/bin:/opt/tools/bin:/bin:/bin:/usr/bin
-export MAKEFLAGS="-j4 -s -e -w"
+export MAKEFLAGS="-j4 -esw"
 
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
 
-TARGET="arm-linux-gnueabi"
+TARGET="armv7l-unknown-linux-gnueabi"
 PREFIX="/opt/tools/"
-SYSROOT="/data/data/gnuoid"
-TARGET_PREFIX="/data/data/gnuoid"
+SYSROOT="$PREFIX/$TARGET"
 
 BOOTSTRAP=$PWD
 
@@ -39,6 +38,7 @@ COMMON_FLAGS="--target=$TARGET \
 	--with-sysroot=$SYSROOT \
 	--disable-multilib \
 	--enable-threads \
+	--disable-werror \
 	--config-cache -q"
 
 is_done() {
@@ -244,6 +244,8 @@ final_gcc() {
 		--disable-libquadmath \
 		--disable-libgomp \
 		--enable-threads=posix \
+		--with-arch=armv7-a \
+		--with-fpu=vfpv3-d16
 		--disable-libmudflap \
 		--enable-__cxa_atexit \
 		--enable-languages=c,c++,go" 

@@ -25,6 +25,16 @@ TARGET="armv7l-unknown-linux-gnueabi"
 PREFIX="/opt/tools/"
 SYSROOT="$PREFIX/$TARGET"
 
+case $TARGET in
+	armv7l-*)
+		ARCH=arm
+		;;
+	*)
+		echo "$TARGET:" unknown arch
+		exit 1
+		;;
+esac
+
 BOOTSTRAP=$PWD
 
 SRC="$BOOTSTRAP/src"
@@ -121,8 +131,8 @@ cross_gcc() {
 
 linux_headers() {
 	local n="linux"
-	local v="2.6.39"
-	local e="tar.xz"
+	local v="3.4.7"
+	local e="tar.bz2"
 
 	is_done $FUNCNAME && return 0
 
@@ -131,7 +141,8 @@ linux_headers() {
 	# build
 	pushd "$SRC/$n-$v"
 		make mrproper
-		make ARCH=arm CROSS_COMPILE=$TARGET- INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
+		make ARCH=$ARCH headers_check
+		make ARCH=$ARCH INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
 
 		touch "$PRG/$FUNCNAME.done"
 	popd
@@ -244,11 +255,10 @@ final_gcc() {
 		--disable-libquadmath \
 		--disable-libgomp \
 		--enable-threads=posix \
-		--with-arch=armv7-a \
-		--with-fpu=vfpv3-d16 \
 		--disable-libmudflap \
 		--enable-__cxa_atexit \
-		--enable-languages=c,c++,go" 
+		--enable-languages=c"
+		#--enable-languages=c,c++,go"
 
 	is_done $FUNCNAME && return 0
 

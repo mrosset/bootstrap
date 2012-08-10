@@ -21,13 +21,16 @@ export MAKEFLAGS="-j4 -esw"
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
 
-TARGET="armv7l-unknown-linux-gnueabi"
+TARGET="x86_64-via-linux-gnu"
 PREFIX="/opt/tools/"
 SYSROOT="$PREFIX/$TARGET"
 
 case $TARGET in
 	armv7l-*)
 		ARCH=arm
+		;;
+	x86_64-*)
+		ARCH=x86_64
 		;;
 	*)
 		echo "$TARGET:" unknown arch
@@ -148,6 +151,22 @@ linux_headers() {
 	popd
 }
 
+uclibc() {
+	local n="uClibc"
+	local v="0.9.33.2"
+	local e="tar.xz"
+	is_done $FUNCNAME && return 0
+
+	stage $n $v $e
+	pushd "$SRC/$n-$v"
+		cp $BOOTSTRAP/uclibc.config .config
+		MAKEFLAGS="-j4" make
+		MAKEFLAGS="-j4" make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+
+}
+
 glibc_headers() {
 	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
@@ -251,14 +270,13 @@ final_gcc() {
 	local n="gcc"
 	local v="4.7.1"
 	local e="tar.bz2"
-	local flags="--disable-libssp \
+	local f="--disable-libssp \
 		--disable-libquadmath \
 		--disable-libgomp \
 		--enable-threads=posix \
 		--disable-libmudflap \
 		--enable-__cxa_atexit \
-		--enable-languages=c"
-		#--enable-languages=c,c++,go"
+		--enable-languages=c,c++,go"
 
 	is_done $FUNCNAME && return 0
 
@@ -267,7 +285,7 @@ final_gcc() {
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		"$SRC/$n-$v/configure" $COMMON_FLAGS $f
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"

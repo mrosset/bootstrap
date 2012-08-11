@@ -1,4 +1,5 @@
 #!/bin/bash
 
+rm -rf src/uClibc*
 rm -rf bld/*
 rm -rf prg/*

@@ -21,21 +21,24 @@ export MAKEFLAGS="-j4 -sw"
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
 
-#TARGET="x86_64-via-linux-uclibc"
-#TARGET="armv7l-via-linux-uclibc"
-TARGET="i686-via-linux-uclibc"
+#TARGET="x86_64-linux-uclibc"
+TARGET="arm-linux-gnueabi"
+#TARGET="i686-linux-uclibc"
 PREFIX="/opt/tools/"
 SYSROOT="$PREFIX/$TARGET"
 
 case $TARGET in
-	arm*-*)
+	arm-*)
 		ARCH=arm
+		MFLAGS="--with-march=armv7"
 		;;
 	x86_64-*)
 		ARCH=x86_64
+		MFLAGS=""
 		;;
 	i686-*)
 		ARCH=i386
+		MFLAGS=""
 		;;
 	*)
 		echo "$TARGET:" unknown arch
@@ -54,11 +57,13 @@ COMMON_FLAGS="--target=$TARGET \
 	--prefix=$PREFIX \
 	--disable-nls \
 	--with-sysroot=$SYSROOT \
-	--enable-obsolete \
 	--disable-multilib \
+	--disable-bootstrap \
 	--enable-threads \
 	--disable-werror \
-	--config-cache -q"
+	--config-cache \
+	$MFLAGS \
+	-q"
 
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
@@ -107,7 +112,6 @@ cross_gcc() {
 	local e="tar.bz2"
 	local flags="--disable-decimal-float \
 		--disable-threads \
-		--disable-bootstrap \
 		--disable-libmudflap \
 		--with-native-system-header-dir=$SYSROOT \
 		--disable-libssp \
@@ -277,10 +281,9 @@ final_gcc() {
 	local v="4.7.1"
 	local e="tar.bz2"
 	local f="--disable-libssp \
-		--disable-libquadmath \
 		--disable-libgomp \
-		--enable-threads=posix \
 		--disable-libmudflap \
+		--disable-libquadmath \
 		--enable-__cxa_atexit \
 		--enable-languages=c"
 

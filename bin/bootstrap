@@ -15,22 +15,23 @@ export PWD=$xpwd
 export USER=$user
 export TERM=$term
 export LC_ALL="POSIX"
-export PATH=$HOME/bin:/opt/tools/bin:/bin:/bin:/usr/bin
+export PATH=$HOME/bin:/opt/tools/bin:/bin:/usr/bin
 export MAKEFLAGS="-j4 -sw"
 
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
 
 #TARGET="x86_64-linux-uclibc"
-TARGET="arm-linux-gnueabi"
-#TARGET="i686-linux-uclibc"
+TARGET="arm-unknown-linux-gnueabi"
+#TARGET="i686-linux-gnu"
 PREFIX="/opt/tools/"
 SYSROOT="$PREFIX/$TARGET"
 
 case $TARGET in
-	arm-*)
+	arm*-*)
 		ARCH=arm
-		MFLAGS="--with-march=armv7"
+		MFLAGS=""
+		#MFLAGS="--with-march=armv7"
 		;;
 	x86_64-*)
 		ARCH=x86_64
@@ -204,7 +205,7 @@ glibc_headers() {
 	# build
 	pushd "$BLD/$FUNCNAME"
 		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
-		make install-headers install_root=$SYSROOT install-bootstrap-headers=yes
+		make install-headers install_root="$SYSROOT" install-bootstrap-headers=yes
 
 		make csu/subdir_lib
 		mkdir -p $SYSROOT/usr/lib
@@ -284,7 +285,7 @@ final_gcc() {
 		--disable-libgomp \
 		--disable-libmudflap \
 		--disable-libquadmath \
-		--enable-__cxa_atexit \
+		--enable-static \
 		--enable-languages=c"
 
 	is_done $FUNCNAME && return 0
@@ -304,8 +305,8 @@ final_gcc() {
 cross_binutils
 cross_gcc
 linux_headers
-uclibc
-#glibc_headers
-#stage2_gcc
-#final_glibc
+#uclibc
+glibc_headers
+stage2_gcc
+final_glibc
 final_gcc

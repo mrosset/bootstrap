@@ -90,7 +90,7 @@ stage() {
 
 cross_binutils() {
 	local n="binutils"
-	local v="2.22"
+	local v="2.23.1"
 	local e="tar.gz"
 	is_done $FUNCNAME && return 0
 
@@ -109,7 +109,7 @@ cross_binutils() {
 
 cross_gcc() {
 	local n="gcc"
-	local v="4.7.1"
+	local v="4.7.2"
 	local e="tar.bz2"
 	local flags="--disable-decimal-float \
 		--disable-threads \
@@ -145,7 +145,7 @@ cross_gcc() {
 
 linux_headers() {
 	local n="linux"
-	local v="3.4.7"
+	local v="3.7.1"
 	local e="tar.bz2"
 
 	is_done $FUNCNAME && return 0
@@ -221,7 +221,7 @@ glibc_headers() {
 
 stage2_gcc() {
 	local n="gcc"
-	local v="4.7.1"
+	local v="4.7.2"
 	local e="tar.bz2"
 	local flags="--disable-libssp \
 		--disable-libquadmath \
@@ -244,7 +244,6 @@ stage2_gcc() {
 }
 
 final_glibc() {
-	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
 	local v="2.13"
 	local r="r13356"
@@ -279,7 +278,7 @@ final_glibc() {
 
 final_gcc() {
 	local n="gcc"
-	local v="4.7.1"
+	local v="4.7.2"
 	local e="tar.bz2"
 	local f="--disable-libssp \
 		--disable-libgomp \

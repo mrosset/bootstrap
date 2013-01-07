@@ -199,6 +199,9 @@ glibc_headers() {
 		stage $n $v-$r $e
 		stage $n-ports $v-$r  $e
 		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
+		pushd "$SRC/eglibc-$v"
+			patch -p1 -i "$TAR/eglibc-2.13-r13356-dl_dep_fix-1.patch"
+		popd
 	fi
 
 	mk_build_dir $FUNCNAME
@@ -269,7 +272,6 @@ final_glibc() {
 	# build
 	pushd "$BLD/$FUNCNAME"
 		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
-		make 
 		make install install_root=$SYSROOT
 		touch "$PRG/$FUNCNAME.done"
 	popd

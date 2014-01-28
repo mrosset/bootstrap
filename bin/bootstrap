@@ -9,17 +9,17 @@ home=$HOME
 
 unset `env | awk -F= '/^\w/ {print $1}' | xargs`
 
-# Exports
+# enviroment
 export HOME=$home
 export PWD=$xpwd
 export USER=$user
 export TERM=$term
 export LC_ALL="POSIX"
 export PATH=$HOME/bin:/opt/tools/bin:/bin:/usr/bin
-export MAKEFLAGS="-j4 -sw"
 
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
+export MAKEFLAGS="-j4 -sw"
 
 #TARGET="x86_64-linux-uclibc"
 TARGET="arm-unknown-linux-gnueabi"
@@ -47,8 +47,8 @@ case $TARGET in
 		;;
 esac
 
+# Dirs
 BOOTSTRAP=$PWD
-
 SRC="$BOOTSTRAP/src"
 BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
@@ -66,6 +66,9 @@ COMMON_FLAGS="--target=$TARGET \
 	$MFLAGS \
 	-q"
 
+# Mirrors
+GNU_MIRROR="http://mirrors.kernel.org/gnu"
+
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
 		echo $1 done skipping.
@@ -73,6 +76,13 @@ is_done() {
 	else
 		return 1;
 	fi
+}
+
+download() {
+	[[ -f $(basename $1) ]] && return 0
+	pushd $TAR
+		wget -c $1
+	popd
 }
 
 mk_build_dir() {
@@ -88,12 +98,16 @@ stage() {
 	return 0
 }
 
+
 cross_binutils() {
 	local n="binutils"
 	local v="2.23.1"
 	local e="tar.gz"
+	local f="$n-$v.$e"
+
 	is_done $FUNCNAME && return 0
 
+	download  "$GNU_MIRROR/$n/$n-$v.$e"
 	stage $n $v $e 
 	mk_build_dir $FUNCNAME
 
@@ -302,6 +316,12 @@ final_gcc() {
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
+
+for i in $SRC $BLD $TAR $PRG; do
+	if [[ ! -d $i ]]; then 
+		mkdir -v $i
+	fi
+done
 
 cross_binutils
 cross_gcc

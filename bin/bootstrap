@@ -113,7 +113,7 @@ cross_sed() {
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure --prefix=$PREFIX
+		$SRC/$n-$v/configure --prefix=$PREFIX -q
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"

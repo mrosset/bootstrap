@@ -22,8 +22,8 @@ export CFLAGS="-O2 -pipe"
 export MAKEFLAGS="-j4 -sw"
 export LIBTOOLFLAGS="--silent"
 
-#TARGET="x86_64-linux-uclibc"
-TARGET="arm-unknown-linux-gnueabi"
+TARGET="x86_64-linux-uclibc"
+#TARGET="arm-unknown-linux-gnueabi"
 #TARGET="i686-linux-gnu"
 PREFIX="/opt/tools/"
 SYSROOT="$PREFIX/$TARGET"
@@ -93,15 +93,15 @@ stage() {
 }
 
 get() {
+	[[ -f $TAR/$(basename $1) ]] && return 0
 	pushd $TAR
-	[[ -f $(basename $1) ]] && return 0
 		wget -c $1
 	popd
 }
 
-cross_texinfo() {
-	local n="texinfo"
-	local v="5.0"
+cross_sed() {
+	local n="sed"
+	local v="4.2"
 	local e="tar.gz"
 	local f="$n-$v.$e"
 
@@ -113,7 +113,28 @@ cross_texinfo() {
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS
+		$SRC/$n-$v/configure --prefix=$PREFIX
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+cross_texinfo() {
+	local n="texinfo"
+	local v="4.13a"
+	local e="tar.gz"
+	local f="$n-$v.$e"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$n/$f"
+	stage $n $v $e
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$n-4.13/configure $COMMON_FLAGS
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -165,7 +186,7 @@ cross_binutils() {
 
 cross_gcc() {
 	local n="gcc"
-	local v="4.7.2"
+	local v="4.7.3"
 	local e="tar.bz2"
 	local f="$n-$v.$e"
 	local flags="--disable-decimal-float \
@@ -228,6 +249,7 @@ uclibc() {
 	local e="tar.xz"
 	is_done $FUNCNAME && return 0
 
+	get "http://www.uclibc.org/downloads/$n-$v.$e"
 	stage $n $v $e
 	pushd "$SRC/$n-$v"
 		cp $BOOTSTRAP/uclibc-$ARCH.config .config
@@ -291,7 +313,7 @@ glibc_headers() {
 
 stage2_gcc() {
 	local n="gcc"
-	local v="4.7.2"
+	local v="4.7.3"
 	local e="tar.bz2"
 	local flags="--disable-libssp \
 		--disable-libquadmath \
@@ -347,7 +369,7 @@ final_glibc() {
 
 final_gcc() {
 	local n="gcc"
-	local v="4.7.2"
+	local v="4.7.3"
 	local e="tar.bz2"
 	local f="--disable-libssp \
 		--disable-libgomp \
@@ -376,7 +398,8 @@ for i in $SRC $BLD $TAR $PRG; do
 	fi
 done
 
-#cross_texinfo
+cross_sed
+cross_texinfo
 cross_make
 cross_binutils
 cross_gcc

@@ -126,7 +126,7 @@ cross_texinfo() {
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
+	get "$GNU_MIRROR/textinfo/$file"
 	localdd
 	stage $n $v $e
 	mk_build_dir $FUNCNAME
@@ -161,21 +161,20 @@ cross_make() {
 	popd
 }
 
+BINUTILS_VERSION="binutils-2.23.1"
+
 cross_binutils() {
-	local n="binutils"
-	local v="2.23.1"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+	local file="$BINUTILS_VERSION.tar.gz"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e 
+	get "$GNU_MIRROR/binutils/$file"
+	stage $file 
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS
+		$SRC/$BINUTILS_VERSION/configure $COMMON_FLAGS
 		make configure-host
 		make
 		make install
@@ -398,9 +397,9 @@ for i in $SRC $BLD $TAR $PRG; do
 	fi
 done
 
-cross_sed
+#cross_sed
 #cross_make
-#cross_binutils
+cross_binutils
 #cross_gcc
 #linux_headers
 ##uclibc

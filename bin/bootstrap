@@ -140,21 +140,19 @@ cross_texinfo() {
 	popd
 }
 
+MAKE_VERSION="make-3.81"
 cross_make() {
-	local n="make"
-	local v="3.81"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+	local file="$MAKE_VERSION.tar.gz"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get "$GNU_MIRROR/make/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS
+		$SRC/$MAKE_VERSION/configure $COMMON_FLAGS
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -182,11 +180,11 @@ cross_binutils() {
 	popd
 }
 
+GCC_VERSION="gcc-4.7.3"
+
 cross_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
-	local f="$n-$v.$e"
+	local file="$GCC_VERSION.tar.bz2"
+
 	local flags="--disable-decimal-float \
 		--disable-threads \
 		--disable-libmudflap \
@@ -207,32 +205,32 @@ cross_gcc() {
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$n-$v/$f"
-	stage $n $v $e 
+	get "$GNU_MIRROR/gcc/$GCC_VERSION/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS $flags
+		$SRC/$GCC_VERSION/configure $COMMON_FLAGS $flags
 		make all-gcc all-target-libgcc
 		make install-gcc install-target-libgcc
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
+
+LINUX_VERSION="linux-3.7.1"
+
 linux_headers() {
-	local n="linux"
-	local v="3.7.1"
-	local e="tar.bz2"
-	local f="$n-$v.$e"
+	local file="$LINUX_VERSION.tar.bz2"
 
 	is_done $FUNCNAME && return 0
 
-	get "https://www.kernel.org/pub/linux/kernel/v3.x/$f"
-	stage $n $v $e
+	get "https://www.kernel.org/pub/linux/kernel/v3.x/$file"
+	stage $file
 
 	# build
-	pushd "$SRC/$n-$v"
+	pushd "$SRC/$LINUX_VERSION"
 		make mrproper
 		make ARCH=$ARCH headers_check
 		make ARCH=$ARCH INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
@@ -397,13 +395,13 @@ for i in $SRC $BLD $TAR $PRG; do
 	fi
 done
 
-#cross_sed
-#cross_make
+cross_sed
+cross_make
 cross_binutils
-#cross_gcc
-#linux_headers
+cross_gcc
+linux_headers
 ##uclibc
-#glibc_headers
+glibc_headers
 #stage2_gcc
 #final_glibc
 #final_gcc

@@ -85,8 +85,8 @@ mk_build_dir() {
 }
 
 stage() {
-	echo ${1%*.}
-	[[ -d $SRC/${1%*.} ]] && return 0
+	dir=${1%.*.*}
+	[[ -d $SRC/$dir ]] && return 0
 	echo staging $1
 	tar xf $TAR/$1 -C "$SRC"
 	return 0
@@ -115,7 +115,7 @@ cross_sed() {
 		$SRC/${SED_VERSION}/configure --prefix=$PREFIX -q
 		make
 		make install
-		touch "$PRG/$FUNCNAME.done"
+		#touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
@@ -256,14 +256,13 @@ uclibc() {
 
 }
 
-glibc_headers() {
-	export MAKEFLAGS="-j4 -s -w"
-	local n="eglibc"
-	local v="2.13"
-	local r="r13356"
-	local e="tar.bz2"
-	local f="$n-$v-$r.$e"
+GLIBC_VERSION="glibc-2.19"
 
+glibc_headers() {
+
+	export MAKEFLAGS="-j4 -s -w"
+
+	local file="$GLIBC_VERSION.tar.xz"
 	local flags="--prefix=/usr \
 		--host=$TARGET \
 		--with-headers=$SYSROOT/usr/include \
@@ -275,24 +274,14 @@ glibc_headers() {
 
 	is_done $FUNCNAME && return 0
 
-	local mirror="http://ftp.cross-lfs.org/pub/clfs/clfs-packages/1.2.0"
-	get "$mirror/$f"
-	get "$mirror/eglibc-ports-2.13-r13356.tar.bz2"
-	get "$mirror/eglibc-2.13-r13356-dl_dep_fix-1.patch"
+	get "$GNU_MIRROR/glibc/$file"
 
-	if [[ ! -d $SRC/$n-$v ]]; then
-		stage $n $v-$r $e
-		stage $n-ports $v-$r  $e
-		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
-		pushd "$SRC/eglibc-$v"
-			patch -p1 -i "$TAR/eglibc-2.13-r13356-dl_dep_fix-1.patch"
-		popd
-	fi
+	stage $file
 
 	mk_build_dir $FUNCNAME
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		"$SRC/$GLIBC_VERSION/configure" $COMMON_FLAGS $flags
 		make install-headers install_root="$SYSROOT" install-bootstrap-headers=yes
 
 		make csu/subdir_lib
@@ -308,9 +297,7 @@ glibc_headers() {
 }
 
 stage2_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
+	local file="$GCC_VERSION.tar.bz2"
 	local flags="--disable-libssp \
 		--disable-libquadmath \
 		--disable-libmudflap \
@@ -319,12 +306,12 @@ stage2_gcc() {
 
 	is_done $FUNCNAME && return 0
 
-	stage $n $v $e 
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		"$SRC/$GCC_VERSION/configure" $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -332,10 +319,7 @@ stage2_gcc() {
 }
 
 final_glibc() {
-	local n="eglibc"
-	local v="2.13"
-	local r="r13356"
-	local e="tar.bz2"
+	local file="$GLIBC_VERSION.tar.xz"
 	local flags="--prefix=/usr \
 		--host=$TARGET \
 		--with-headers=$SYSROOT/usr/include \
@@ -347,16 +331,12 @@ final_glibc() {
 
 	is_done $FUNCNAME && return 0
 
-	if [[ ! -d $SRC/$n-$v ]]; then
-		stage $n $v-$r $e
-		stage $n-ports $v-$r  $e
-		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
-	fi
+	stage $file
 
 	mk_build_dir $FUNCNAME
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		"$SRC/$GLIBC_VERSION/configure" $COMMON_FLAGS $flags
 		make all
 		make install install_root=$SYSROOT
 		touch "$PRG/$FUNCNAME.done"
@@ -365,10 +345,8 @@ final_glibc() {
 }
 
 final_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
-	local f="--disable-libssp \
+	local file="$GCC_VERSION.tar.bz2"
+	local flags="--disable-libssp \
 		--disable-libgomp \
 		--disable-libmudflap \
 		--disable-libquadmath \
@@ -377,12 +355,12 @@ final_gcc() {
 
 	is_done $FUNCNAME && return 0
 
-	stage $n $v $e 
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $f
+		"$SRC/$GCC_VERSION/configure" $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -402,6 +380,6 @@ cross_gcc
 linux_headers
 ##uclibc
 glibc_headers
-#stage2_gcc
-#final_glibc
-#final_gcc
+stage2_gcc
+final_glibc
+final_gcc

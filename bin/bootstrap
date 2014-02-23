@@ -59,7 +59,6 @@ COMMON_FLAGS="--target=$TARGET \
 	--prefix=$PREFIX \
 	--disable-nls \
 	--with-sysroot=$SYSROOT \
-	--disable-multilib \
 	--disable-bootstrap \
 	--enable-threads \
 	--disable-werror \
@@ -180,7 +179,7 @@ cross_binutils() {
 	popd
 }
 
-GCC_VERSION="gcc-4.7.3"
+GCC_VERSION="gcc-4.8.2"
 
 cross_gcc() {
 	local file="$GCC_VERSION.tar.bz2"

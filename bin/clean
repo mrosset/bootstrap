@@ -3,3 +3,4 @@
 rm -rf src/uClibc*
 rm -rf bld/*
 rm -rf prg/*
+rm -rf /opt/tools/*

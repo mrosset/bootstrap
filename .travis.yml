@@ -1,3 +1,3 @@
 language: c
 
-install: bin/boostrap
+install: bin/bootstrap

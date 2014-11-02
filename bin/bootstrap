@@ -49,7 +49,7 @@ case $TARGET in
 esac
 
 # Dirs
-BOOTSTRAP=$PWD
+BOOTSTRAP="$HOME/build"
 SRC="$BOOTSTRAP/src"
 BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"

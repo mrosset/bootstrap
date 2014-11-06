@@ -8,7 +8,7 @@ user=$USER
 term=$TERM
 home=$HOME
 
-unset `env | awk -F= '/^\w/ {print $1}' | xargs`
+#unset `env | awk -F= '/^\w/ {print $1}' | xargs`
 
 # enviroment
 export HOME=$home
@@ -20,7 +20,7 @@ export PATH=$HOME/bin:/opt/tools/bin:/bin:/usr/bin
 
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
-export MAKEFLAGS="-j4 -sw"
+export MAKEFLAGS="-j5 -sw"
 export LIBTOOLFLAGS="--silent"
 
 #TARGET="x86_64-linux-uclibc"
@@ -185,6 +185,69 @@ cross_binutils() {
 	popd
 }
 
+cross_mpc() {
+	local n="mpc"
+	local v="1.0.2"
+	local e="tar.gz"
+	local f="$n-$v.$e"
+	local flags="--with-gmp=$PREFIX"
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$n/$f"
+	stage $n $v $e
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$n-$v/configure --prefix=$PREFIX $flags -q
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+cross_mpfr() {
+	local n="mpfr"
+	local v="3.1.2"
+	local e="tar.xz"
+	local f="$n-$v.$e"
+	local flags="--with-gmp=$PREFIX"
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$n/$f"
+	stage $n $v $e
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$n-$v/configure --prefix=$PREFIX $flags -q
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+cross_gmp() {
+	local n="gmp"
+	local v="6.0.0a"
+	local e="tar.xz"
+	local f="$n-$v.$e"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$n/$f"
+	stage $n $v $e
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$n-6.0.0/configure --prefix=$PREFIX -q
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
 cross_gcc() {
 	local n="gcc"
 	local v="4.7.3"
@@ -204,6 +267,7 @@ cross_gcc() {
 		--without-ppl \
 		--without-cloog \
 		--with-newlib \
+		--with-gmp=$PREFIX \
 		--prefix=$PREFIX \
 		--enable-languages=c"
 
@@ -403,6 +467,9 @@ done
 cross_sed
 cross_make
 cross_binutils
+cross_gmp
+cross_mpfr
+cross_mpc
 cross_gcc
 linux_headers
 #uclibc

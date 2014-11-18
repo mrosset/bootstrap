@@ -33,15 +33,15 @@ export CPPFLAGS="$CFLAGS"
 export MAKEFLAGS="-sw"
 export LIBTOOLFLAGS="--silent"
 
-#TARGET="x86_64-linux-uclibc"
-TARGET="arm-unknown-linux-gnueabi"
+LFS_TGT="x86_64-lfs-linux-gnu"
+#TARGET="arm-unknown-linux-gnueabi"
 #TARGET="i686-linux-gnu"
-PREFIX="$HOME/tools"
-SYSROOT="$HOME/system/$TARGET"
+LFS="/mnt/lfs"
+PREFIX="/tools"
 
 export PATH=$HOME/bin:$PREFIX/bin:/bin:/usr/bin
 
-case $TARGET in
+case $LFS_TGT in
 	arm*-*)
 		ARCH=arm
 		MFLAGS=""
@@ -67,17 +67,7 @@ BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
-COMMON_FLAGS="--target=$TARGET \
-	--prefix=$PREFIX \
-	--disable-nls \
-	--with-sysroot=$SYSROOT \
-	--with-lib-path=$PREFIX/tools \
-	--disable-multilib \
-	--disable-bootstrap \
-	--disable-werror \
-	--config-cache \
-	$MFLAGS \
-	-q"
+COMMON_FLAGS="--disable-bootstrap --config-cache -q"
 
 # Mirrors
 GNU_MIRROR="http://mirrors.kernel.org/gnu"
@@ -194,11 +184,18 @@ cross_make() {
 
 BINUTILS_VERSION="2.24"
 
-cross_binutils() {
+stage1_binutils() {
 	local name="binutils"
 	local ver="$BINUTILS_VERSION"
 	local file="$name-$ver.tar.bz2"
-
+	local flags="\
+		--prefix=/tools            \
+		--with-sysroot=$LFS        \
+		--with-lib-path=/tools/lib \
+		--target=$LFS_TGT          \
+		--disable-nls              \
+		--disable-werror"
+	
 	is_done $FUNCNAME && return 0
 
 	get "$GNU_MIRROR/$name/$file"
@@ -207,17 +204,18 @@ cross_binutils() {
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$name-$ver/configure $COMMON_FLAGS
+		$SRC/$name-$ver/configure $COMMON_FLAGS $flags
 		make configure-host
 		make
 		make install
+		mkdir -v $PREFIX/lib && ln -sv lib $PREFIX/lib64
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
 MPC_VERSION="1.0.2"
 
-cross_mpc() {
+stage2_mpc() {
 	local name="mpc"
 	local version="$MPC_VERSION"
 	local ext="tar.gz"
@@ -240,7 +238,7 @@ cross_mpc() {
 
 MPFR_VERSION="3.1.2"
 
-cross_mpfr() {
+stage2_mpfr() {
 	local name="mpfr"
 	local version="$MPFR_VERSION"
 	local ext="tar.xz"
@@ -263,7 +261,7 @@ cross_mpfr() {
 
 GMP_VERSION="6.0.0a"
 
-cross_gmp() {
+stage2_gmp() {
 	local name="gmp"
 	local version="$GMP_VERSION"
 	local ext="tar.xz"
@@ -286,31 +284,35 @@ cross_gmp() {
 
 GCC_VERSION="4.9.2"
 
-cross_gcc() {
+stage1_gcc() {
 	local name="gcc"
 	local version="$GCC_VERSION"
 	local ext="tar.bz2"
 	local file="$name-$version.$ext"
 
-	local flags="--disable-decimal-float \
-		--disable-threads \
-		--disable-libmudflap \
-		--with-native-system-header-dir=$PREFIX/include \
-		--disable-libssp \
-		--disable-shared \
-		--disable-libgomp \
-		--disable-libquadmath \
-		--disable-target-libiberty  \
-		--disable-target-zlib \
-	    --disable-libstdc++-v3 \
-		--without-headers \
-		--without-ppl \
-		--without-cloog \
-		--with-newlib \
-		--with-gmp=$PREFIX \
-		--prefix=$PREFIX \
-		--enable-languages=c"
-
+	local flags="\
+		--target=$LFS_TGT                                \
+		--prefix=$PREFIX                                 \
+		--with-sysroot=$LFS                              \
+		--with-newlib                                    \
+		--without-headers                                \
+		--with-local-prefix=$PREFIX                      \
+		--with-native-system-header-dir=$PREFIX/include  \
+		--disable-nls                                    \
+		--disable-shared                                 \
+		--disable-multilib                               \
+		--disable-decimal-float                          \
+		--disable-threads                                \
+		--disable-libatomic                              \
+		--disable-libgomp                                \
+		--disable-libitm                                 \
+		--disable-libquadmath                            \
+		--disable-libsanitizer                           \
+		--disable-libssp                                 \
+		--disable-libvtv                                 \
+		--disable-libcilkrts                             \
+		--disable-libstdc++-v3                           \
+		--enable-languages=c,c++"
 
 	is_done $FUNCNAME && return 0
 
@@ -318,11 +320,31 @@ cross_gcc() {
 	stage $file
 	mk_build_dir $FUNCNAME
 
+	pushd "$SRC/$name-$version"
+	if [[ ! -f $PRG/${FUNCNAME}_patch ]]; then
+		sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure
+		for file in \
+			$(find gcc/config -name linux64.h -o -name linux.h -o -name sysv4.h)
+	do
+		cp -uv $file{,.orig}
+		sed -e 's@/lib\(64\)\?\(32\)\?/ld@/tools&@g' \
+			-e 's@/usr@/tools@g' $file.orig > $file
+		echo '
+		#undef STANDARD_STARTFILE_PREFIX_1
+		#undef STANDARD_STARTFILE_PREFIX_2
+		#define STANDARD_STARTFILE_PREFIX_1 "/tools/lib/"
+		#define STANDARD_STARTFILE_PREFIX_2 ""' >> $file
+		touch $file.orig
+	done
+	touch "$PRG/${FUNCNAME}_patch.done"
+	fi
+	popd
+
 	# build
 	pushd "$BLD/$FUNCNAME"
 		$SRC/$name-$version/configure $COMMON_FLAGS $flags
-		make all-gcc all-target-libgcc
-		make install-gcc install-target-libgcc
+		make all
+		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
@@ -344,8 +366,7 @@ linux_headers() {
 	pushd "$SRC/$name-$version"
 		make mrproper
 		make ARCH=$ARCH headers_check
-		make ARCH=$ARCH INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
-
+		make ARCH=$ARCH INSTALL_HDR_PATH="$PREFIX" headers_install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
@@ -369,19 +390,20 @@ uclibc() {
 
 GLIBC_VERSION="2.20"
 
-glibc_headers() {
+stage1_glibc() {
 	local name="glibc"
 	local version="$GLIBC_VERSION"
 	local ext="tar.xz"
 	local file="$name-$version.$ext"
 	local flags="\
-		--host=$TARGET
-		--build=$(../glibc-2.20/scripts/config.guess) \
-		--disable-profile                             \
-		--enable-kernel=2.6.32                        \
-		--with-headers=$SYSROOT/usr/include                 \
-		libc_cv_forced_unwind=yes                     \
-		libc_cv_ctors_header=yes                      \
+		--prefix=$PREFIX                                \
+		--host=$LFS_TGT                                 \
+		--build=$($SRC/glibc-2.20/scripts/config.guess) \
+		--disable-profile                               \
+		--enable-kernel=2.6.32                          \
+		--with-headers=$PREFIX/include                  \
+		libc_cv_forced_unwind=yes                       \
+		libc_cv_ctors_header=yes                        \
 		libc_cv_c_cleanup=yes"
 
 	is_done $FUNCNAME && return 0
@@ -394,81 +416,100 @@ glibc_headers() {
 	pushd "$BLD/$FUNCNAME"
 		$SRC/$name-$version/configure $COMMON_FLAGS $flags
 		make
-		#touch "$PRG/$FUNCNAME.done"
-	popd
-
-}
-
-_glibc_headers() {
-	export MAKEFLAGS="-j4 -s -w"
-	local n="eglibc"
-	local v="2.13"
-	local r="r13356"
-	local e="tar.bz2"
-	local f="$n-$v-$r.$e"
-
-	local flags="--prefix=/usr \
-		--host=$TARGET \
-		--with-headers=$SYSROOT/usr/include \
-		--disable-profile \
-		--without-gd \
-		--without-cvs \
-		--enable-add-ons \
-		--enable-kernel=2.6.39"
-
-	is_done $FUNCNAME && return 0
-
-	local mirror="http://ftp.cross-lfs.org/pub/clfs/clfs-packages/1.2.0"
-	get "$mirror/$f"
-	get "$mirror/eglibc-ports-2.13-r13356.tar.bz2"
-	get "$mirror/eglibc-2.13-r13356-dl_dep_fix-1.patch"
-
-	if [[ ! -d $SRC/$n-$v ]]; then
-		stage $n $v-$r $e
-		stage $n-ports $v-$r  $e
-		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
-		pushd "$SRC/eglibc-$v"
-			patch -p1 -i "$TAR/eglibc-2.13-r13356-dl_dep_fix-1.patch"
-		popd
-	fi
-
-	mk_build_dir $FUNCNAME
-	# build
-	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
-		make install-headers install_root="$SYSROOT" install-bootstrap-headers=yes
-
-		make csu/subdir_lib
-		mkdir -p $SYSROOT/usr/lib
-		cp csu/crt1.o csu/crti.o csu/crtn.o $SYSROOT/usr/lib
-
-		$TARGET-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
-			-o "$SYSROOT/usr/lib/libc.so"
-
+		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 
 }
 
-stage2_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
-	local flags="--disable-libssp \
-		--disable-libquadmath \
-		--disable-libmudflap \
-		--with-gmp=$PREFIX \
-		--disable-libgomp \
-		--enable-languages=c" 
+stage1_libstdc++() {
+	local name="gcc"
+	local version="$GCC_VERSION"
+	local flags="\
+		--host=$LFS_TGT                 \
+		--prefix=$PREFIX                \
+		--disable-multilib              \
+		--disable-shared                \
+		--disable-nls                   \
+		--disable-libstdcxx-threads     \
+		--disable-libstdcxx-pch         \
+		--with-gxx-include-dir=$PREFIX/$LFS_TGT/include/c++/$version"
 
 	is_done $FUNCNAME && return 0
-
-	stage $n $v $e 
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
+		$SRC/$name-$version/libstdc++-v3/configure $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+
+}
+
+test_gcc() {
+	echo 'main(){ return 0; }' > dummy.c
+	$LFS_TGT-gcc dummy.c
+	readelf -l a.out | grep ": $PREFIX"
+	./a.out
+	echo stage1 gcc ok
+	return 0
+}
+
+stage2_binutils() {
+	local name="binutils"
+	local version="$BINUTILS_VERSION"
+	local flags="\
+		CC=$LFS_TGT-gcc                \
+		AR=$LFS_TGT-ar                 \
+		RANLIB=$LFS_TGT-ranlib         \
+		--prefix=$PREFIX               \
+		--disable-nls                  \
+		--disable-werror               \
+		--with-lib-path=$PREFIX/lib    \
+		--with-sysroot"
+
+	is_done $FUNCNAME && return 0
+	mk_build_dir $FUNCNAME
+
+	pushd "$BLD/$FUNCNAME"
+		"$SRC/$name-$version/configure" $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+stage2_gcc() {
+	local name="gcc"
+	local version="$GCC_VERSION"
+	local flags="\
+		CC=$LFS_TGT-gcc                                  \
+		CXX=$LFS_TGT-g++                                 \
+		AR=$LFS_TGT-ar                                   \
+		RANLIB=$LFS_TGT-ranlib                           \
+		--prefix=$PREFIX                                 \
+		--with-local-prefix=$PREFIX                      \
+		--with-native-system-header-dir=$PREFIX/include  \
+		--enable-languages=c,c++                         \
+		--disable-libstdcxx-pch                          \
+		--disable-multilib                               \
+		--disable-bootstrap                              \
+		--disable-libgomp"
+
+	is_done $FUNCNAME && return 0
+
+	mk_build_dir $FUNCNAME
+
+	pushd "$SRC/$name-$version"
+		cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
+			`dirname $($LFS_TGT-gcc -print-libgcc-file-name)`/include-fixed/limits.h
+	popd
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		"$SRC/$name-$version/configure" $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -508,32 +549,6 @@ final_glibc() {
 
 }
 
-final_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
-	local f="--disable-libssp \
-		--disable-libgomp \
-		--disable-libmudflap \
-		--disable-libquadmath \
-		--with-gmp=$PREFIX \
-		--enable-static \
-		--enable-languages=c"
-
-	is_done $FUNCNAME && return 0
-
-	stage $n $v $e 
-	mk_build_dir $FUNCNAME
-
-	# build
-	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $f
-		make
-		make install
-		touch "$PRG/$FUNCNAME.done"
-	popd
-}
-
 for i in $SRC $BLD $TAR $PRG; do
 	if [[ ! -d $i ]]; then 
 		mkdir -p -v $i
@@ -543,10 +558,15 @@ done
 #cross_sed
 #cross_make
 #native_compiler
-cross_binutils
-cross_gmp
-cross_mpfr
-cross_mpc
-cross_gcc
+stage1_binutils
+stage1_gcc
 linux_headers
-glibc_headers
+stage1_glibc
+test_gcc
+stage1_libstdc++
+stage2_binutils
+stage2_gmp
+stage2_mpfr
+stage2_mpc
+stage2_gcc
+test_gcc

@@ -8,7 +8,9 @@ user=$USER
 term=$TERM
 home=$HOME
 
-#unset `env | awk -F= '/^\w/ {print $1}' | xargs`
+unset $(env | awk -F= '/^\w/ {print $1}' | xargs)
+
+
 
 # enviroment
 export HOME=$home
@@ -17,18 +19,27 @@ export USER=$user
 export TERM=$term
 export LC_ALL="POSIX"
 
+BOOTSTRAP="$PWD"
+
+# check we are in the right directory
+if [[ ! -f $BOOTSTRAP/bin/bootstrap ]]; then
+	echo This needs to be run in boostrap directory eg. bin/bootstrap
+	exit 1
+fi
+
 # toolchain tweaks
 export CFLAGS="-O2 -pipe"
+export CPPFLAGS="$CFLAGS"
 export MAKEFLAGS="-sw"
 export LIBTOOLFLAGS="--silent"
 
 #TARGET="x86_64-linux-uclibc"
 TARGET="arm-unknown-linux-gnueabi"
 #TARGET="i686-linux-gnu"
-PREFIX="$HOME/tools/"
-SYSROOT="$PREFIX/$TARGET"
+PREFIX="$HOME/tools"
+SYSROOT="$HOME/system/$TARGET"
 
-export PATH=$HOME/bin:/$PREFIX/bin:/bin:/usr/bin
+export PATH=$HOME/bin:$PREFIX/bin:/bin:/usr/bin
 
 case $TARGET in
 	arm*-*)
@@ -51,7 +62,6 @@ case $TARGET in
 esac
 
 # Dirs
-BOOTSTRAP="$HOME/build"
 SRC="$BOOTSTRAP/src"
 BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
@@ -61,9 +71,9 @@ COMMON_FLAGS="--target=$TARGET \
 	--prefix=$PREFIX \
 	--disable-nls \
 	--with-sysroot=$SYSROOT \
+	--with-lib-path=$PREFIX/tools \
 	--disable-multilib \
 	--disable-bootstrap \
-	--enable-threads \
 	--disable-werror \
 	--config-cache \
 	$MFLAGS \
@@ -74,7 +84,7 @@ GNU_MIRROR="http://mirrors.kernel.org/gnu"
 
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
-		echo $1 done skipping.
+		echo "$1 done skipping."
 		return 0;
 	else
 		return 1;
@@ -87,35 +97,37 @@ mk_build_dir() {
 }
 
 stage() {
-	d="$1-$2"
-	[[ -d $SRC/$d ]] && return 0
-	echo staging $1-$2
-	tar xf $TAR/$d.$3 -C "$SRC"
+	local dir="${file%.*.*}"
+	[[ -d $SRC/$dir ]] && return 0 
+	echo "staging $1"
+	tar xf "$TAR/$1" -C "$SRC"
 	return 0
 }
 
 get() {
-	[[ -f $TAR/$(basename $1) ]] && return 0
-	pushd $TAR
-		wget -c $1
+	[[ -f $TAR/$(/usr/bin/basename $1) ]] && return 0
+	pushd "$TAR"
+		/usr/bin/wget -c "$1"
 	popd
 }
 
+SED_VERSION="4.2.2"
+
 cross_sed() {
-	local n="sed"
-	local v="4.2"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+	local name="sed"
+	local ver="$SED_VERSION"
+	local ext="tar.bz2"
+	local file="$name-$ver.$ext"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure --prefix=$PREFIX -q
+		$SRC/$name-$ver/configure --prefix=$PREFIX -q
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -143,42 +155,59 @@ cross_texinfo() {
 	popd
 }
 
-cross_make() {
-	local n="make"
-	local v="3.82"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+native_compiler() {
+	local upstream="http://landley.net/aboriginal/downloads/binaries/root-filesystem/native-compiler-x86_64.tar.bz2"
+	local file="$(/usr/bin/basename $upstream)"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get $upstream
+	stage $file
+	mv "$SRC/${file%.*.*}" .
+	touch "$PRG/$FUNCNAME.done"
+	#get $upstream
+}
+
+
+MAKE_VERSION="3.82"
+
+cross_make() {
+	local name="make"
+	local ver="$MAKE_VERSION"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS
+		$SRC/$name-$ver/configure $COMMON_FLAGS
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
+BINUTILS_VERSION="2.24"
+
 cross_binutils() {
-	local n="binutils"
-	local v="2.23.1"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+	local name="binutils"
+	local ver="$BINUTILS_VERSION"
+	local file="$name-$ver.tar.bz2"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e 
+	get "$GNU_MIRROR/$name/$file"
+	stage "$file"
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS
+		$SRC/$name-$ver/configure $COMMON_FLAGS
 		make configure-host
 		make
 		make install
@@ -186,84 +215,94 @@ cross_binutils() {
 	popd
 }
 
+MPC_VERSION="1.0.2"
+
 cross_mpc() {
-	local n="mpc"
-	local v="1.0.2"
-	local e="tar.gz"
-	local f="$n-$v.$e"
+	local name="mpc"
+	local version="$MPC_VERSION"
+	local ext="tar.gz"
+	local file="$name-$version.$ext"
 	local flags="--with-gmp=$PREFIX"
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure --prefix=$PREFIX $flags -q
+		$SRC/$name-$version/configure --prefix=$PREFIX $flags -q
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
+
+MPFR_VERSION="3.1.2"
 
 cross_mpfr() {
-	local n="mpfr"
-	local v="3.1.2"
-	local e="tar.xz"
-	local f="$n-$v.$e"
+	local name="mpfr"
+	local version="$MPFR_VERSION"
+	local ext="tar.xz"
+	local file="$name-$version.$ext"
 	local flags="--with-gmp=$PREFIX"
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure --prefix=$PREFIX $flags -q
+		$SRC/$name-$version/configure --prefix=$PREFIX $flags -q
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
+GMP_VERSION="6.0.0a"
+
 cross_gmp() {
-	local n="gmp"
-	local v="6.0.0a"
-	local e="tar.xz"
-	local f="$n-$v.$e"
+	local name="gmp"
+	local version="$GMP_VERSION"
+	local ext="tar.xz"
+	local file="$name-$version.$ext"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$f"
-	stage $n $v $e
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-6.0.0/configure --prefix=$PREFIX -q
+		$SRC/$name-6.0.0/configure --prefix=$PREFIX -q
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
+GCC_VERSION="4.9.2"
+
 cross_gcc() {
-	local n="gcc"
-	local v="4.7.3"
-	local e="tar.bz2"
-	local f="$n-$v.$e"
+	local name="gcc"
+	local version="$GCC_VERSION"
+	local ext="tar.bz2"
+	local file="$name-$version.$ext"
+
 	local flags="--disable-decimal-float \
 		--disable-threads \
 		--disable-libmudflap \
-		--with-native-system-header-dir=$SYSROOT \
+		--with-native-system-header-dir=$PREFIX/include \
 		--disable-libssp \
 		--disable-shared \
 		--disable-libgomp \
 		--disable-libquadmath \
 		--disable-target-libiberty  \
 		--disable-target-zlib \
+	    --disable-libstdc++-v3 \
 		--without-headers \
 		--without-ppl \
 		--without-cloog \
@@ -275,32 +314,34 @@ cross_gcc() {
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$n/$n-$v/$f"
-	stage $n $v $e 
+	get "$GNU_MIRROR/$name/$name-$version/$file"
+	stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
 	pushd "$BLD/$FUNCNAME"
-		$SRC/$n-$v/configure $COMMON_FLAGS $flags
+		$SRC/$name-$version/configure $COMMON_FLAGS $flags
 		make all-gcc all-target-libgcc
 		make install-gcc install-target-libgcc
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
 
+LINUX_VERSION="3.17.2"
+
 linux_headers() {
-	local n="linux"
-	local v="3.7.1"
-	local e="tar.bz2"
-	local f="$n-$v.$e"
+	local name="linux"
+	local version="$LINUX_VERSION"
+	local ext="tar.xz"
+	local file="$name-$version.$ext"
 
 	is_done $FUNCNAME && return 0
 
-	get "https://www.kernel.org/pub/linux/kernel/v3.x/$f"
-	stage $n $v $e
+	get "https://www.kernel.org/pub/linux/kernel/v3.x/$file"
+	stage $file
 
 	# build
-	pushd "$SRC/$n-$v"
+	pushd "$SRC/$name-$version"
 		make mrproper
 		make ARCH=$ARCH headers_check
 		make ARCH=$ARCH INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
@@ -326,7 +367,39 @@ uclibc() {
 
 }
 
+GLIBC_VERSION="2.20"
+
 glibc_headers() {
+	local name="glibc"
+	local version="$GLIBC_VERSION"
+	local ext="tar.xz"
+	local file="$name-$version.$ext"
+	local flags="\
+		--host=$TARGET
+		--build=$(../glibc-2.20/scripts/config.guess) \
+		--disable-profile                             \
+		--enable-kernel=2.6.32                        \
+		--with-headers=$SYSROOT/usr/include                 \
+		libc_cv_forced_unwind=yes                     \
+		libc_cv_ctors_header=yes                      \
+		libc_cv_c_cleanup=yes"
+
+	is_done $FUNCNAME && return 0
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$version/configure $COMMON_FLAGS $flags
+		make
+		#touch "$PRG/$FUNCNAME.done"
+	popd
+
+}
+
+_glibc_headers() {
 	export MAKEFLAGS="-j4 -s -w"
 	local n="eglibc"
 	local v="2.13"
@@ -467,16 +540,13 @@ for i in $SRC $BLD $TAR $PRG; do
 	fi
 done
 
-cross_sed
+#cross_sed
 #cross_make
+#native_compiler
 cross_binutils
 cross_gmp
 cross_mpfr
 cross_mpc
 cross_gcc
 linux_headers
-#uclibc
 glibc_headers
-stage2_gcc
-final_glibc
-final_gcc

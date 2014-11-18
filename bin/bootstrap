@@ -371,23 +371,6 @@ linux_headers() {
 	popd
 }
 
-uclibc() {
-	local n="uClibc"
-	local v="0.9.33.2"
-	local e="tar.xz"
-	is_done $FUNCNAME && return 0
-
-	get "http://www.uclibc.org/downloads/$n-$v.$e"
-	stage $n $v $e
-	pushd "$SRC/$n-$v"
-		cp $BOOTSTRAP/uclibc-$ARCH.config .config
-		sed -i "s/XTARGETX/$TARGET/g" .config
-		make install
-		touch "$PRG/$FUNCNAME.done"
-	popd
-
-}
-
 GLIBC_VERSION="2.20"
 
 stage1_glibc() {
@@ -516,39 +499,6 @@ stage2_gcc() {
 	popd
 }
 
-final_glibc() {
-	local n="eglibc"
-	local v="2.13"
-	local r="r13356"
-	local e="tar.bz2"
-	local flags="--prefix=/usr \
-		--host=$TARGET \
-		--with-headers=$SYSROOT/usr/include \
-		--disable-profile \
-		--without-gd \
-		--without-cvs \
-		--enable-add-ons \
-		--enable-kernel=2.6.39"
-
-	is_done $FUNCNAME && return 0
-
-	if [[ ! -d $SRC/$n-$v ]]; then
-		stage $n $v-$r $e
-		stage $n-ports $v-$r  $e
-		cp -a "$SRC/ports" "$SRC/$n-$v/ports"
-	fi
-
-	mk_build_dir $FUNCNAME
-	# build
-	pushd "$BLD/$FUNCNAME"
-		"$SRC/$n-$v/configure" $COMMON_FLAGS $flags
-		make all
-		make install install_root=$SYSROOT
-		touch "$PRG/$FUNCNAME.done"
-	popd
-
-}
-
 for i in $SRC $BLD $TAR $PRG; do
 	if [[ ! -d $i ]]; then 
 		mkdir -p -v $i
@@ -570,3 +520,4 @@ stage2_mpfr
 stage2_mpc
 stage2_gcc
 test_gcc
+tools_bash

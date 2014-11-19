@@ -67,10 +67,21 @@ BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
-COMMON_FLAGS="--disable-bootstrap --config-cache -q"
+COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache -q"
 
 # Mirrors
 GNU_MIRROR="http://mirrors.kernel.org/gnu"
+
+
+lfs_chroot() {
+	sudo chroot "$LFS" $PREFIX/bin/env -i \
+		HOME=$HOME                  \
+		TERM="$TERM"                \
+		PS1='\u:\w\$ '              \
+		PATH=/bin:/usr/bin:/sbin:/usr/sbin:$PREFIX/bin:$PREFIX/usr/bin \
+		$PREFIX/bin/bash --login +h
+	exit 0
+}
 
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
@@ -189,7 +200,6 @@ stage1_binutils() {
 	local ver="$BINUTILS_VERSION"
 	local file="$name-$ver.tar.bz2"
 	local flags="\
-		--prefix=/tools            \
 		--with-sysroot=$LFS        \
 		--with-lib-path=/tools/lib \
 		--target=$LFS_TGT          \
@@ -292,7 +302,6 @@ stage1_gcc() {
 
 	local flags="\
 		--target=$LFS_TGT                                \
-		--prefix=$PREFIX                                 \
 		--with-sysroot=$LFS                              \
 		--with-newlib                                    \
 		--without-headers                                \
@@ -379,7 +388,6 @@ stage1_glibc() {
 	local ext="tar.xz"
 	local file="$name-$version.$ext"
 	local flags="\
-		--prefix=$PREFIX                                \
 		--host=$LFS_TGT                                 \
 		--build=$($SRC/glibc-2.20/scripts/config.guess) \
 		--disable-profile                               \
@@ -410,7 +418,6 @@ stage1_libstdc++() {
 	local version="$GCC_VERSION"
 	local flags="\
 		--host=$LFS_TGT                 \
-		--prefix=$PREFIX                \
 		--disable-multilib              \
 		--disable-shared                \
 		--disable-nls                   \
@@ -447,7 +454,6 @@ stage2_binutils() {
 		CC=$LFS_TGT-gcc                \
 		AR=$LFS_TGT-ar                 \
 		RANLIB=$LFS_TGT-ranlib         \
-		--prefix=$PREFIX               \
 		--disable-nls                  \
 		--disable-werror               \
 		--with-lib-path=$PREFIX/lib    \
@@ -472,7 +478,6 @@ stage2_gcc() {
 		CXX=$LFS_TGT-g++                                 \
 		AR=$LFS_TGT-ar                                   \
 		RANLIB=$LFS_TGT-ranlib                           \
-		--prefix=$PREFIX                                 \
 		--with-local-prefix=$PREFIX                      \
 		--with-native-system-header-dir=$PREFIX/include  \
 		--enable-languages=c,c++                         \
@@ -499,25 +504,90 @@ stage2_gcc() {
 	popd
 }
 
+BASH_VERSION="4.3"
+
+tools_bash() {
+	local name="bash"
+	local ver="$BASH_VERSION"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS --prefix=$PREFIX -q
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_toybox() {
+	file="toybox-$ARCH"
+	get "http://landley.net/toybox/bin/$file"
+	install -d "$PREFIX/usr/bin"
+	install -d "$PREFIX/usr/sbin"
+	install $TAR/$file $PREFIX/bin/toybox
+	for i in $($PREFIX/bin/toybox --long); do 
+		ln -sfv "$PREFIX/bin/toybox" "$PREFIX/$i"
+	done
+	touch "$PRG/$FUNCNAME.done"
+}
+
+COREUTILS_VERSION="8.23"
+
+tools_coreutils() {
+	local name="coreutils"
+	local ver="$COREUTILS_VERSION"
+	local ext="tar.xz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
 for i in $SRC $BLD $TAR $PRG; do
 	if [[ ! -d $i ]]; then 
 		mkdir -p -v $i
 	fi
 done
 
-#cross_sed
-#cross_make
-#native_compiler
-stage1_binutils
-stage1_gcc
-linux_headers
-stage1_glibc
-test_gcc
-stage1_libstdc++
-stage2_binutils
-stage2_gmp
-stage2_mpfr
-stage2_mpc
-stage2_gcc
-test_gcc
-tools_bash
+if [[ $1 == chroot ]]; then
+	lfs_chroot
+	exit 0
+fi
+
+if [[ $1 == build ]]; then
+	#cross_sed
+	#cross_make
+	#native_compiler
+	stage1_binutils
+	stage1_gcc
+	linux_headers
+	stage1_glibc
+	test_gcc
+	stage1_libstdc++
+	stage2_binutils
+	stage2_gmp
+	stage2_mpfr
+	stage2_mpc
+	stage2_gcc
+	test_gcc
+	tools_bash
+	tools_coreutils
+fi

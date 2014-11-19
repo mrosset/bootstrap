@@ -74,8 +74,9 @@ GNU_MIRROR="http://mirrors.kernel.org/gnu"
 
 
 lfs_chroot() {
-	sudo chroot "$LFS" $PREFIX/bin/env -i \
-		HOME=$HOME                  \
+	sudo arch-chroot "$LFS" $PREFIX/bin/env -i \
+		EDITOR=vim                  \
+		HOME=/root                  \
 		TERM="$TERM"                \
 		PS1='\u:\w\$ '              \
 		PATH=/bin:/usr/bin:/sbin:/usr/sbin:$PREFIX/bin:$PREFIX/usr/bin \
@@ -85,7 +86,7 @@ lfs_chroot() {
 
 is_done() {
 	if [[ -f $PRG/$1.done ]]; then
-		echo "$1 done skipping."
+		#echo "$1 done skipping."
 		return 0;
 	else
 		return 1;
@@ -139,7 +140,7 @@ generic_build() {
 
 SED_VERSION="4.2.2"
 
-cross_sed() {
+tools_sed() {
 	local name="sed"
 	local ver="$SED_VERSION"
 	local ext="tar.bz2"
@@ -194,29 +195,6 @@ native_compiler() {
 	#get $upstream
 }
 
-
-MAKE_VERSION="3.82"
-
-cross_make() {
-	local name="make"
-	local ver="$MAKE_VERSION"
-	local ext="tar.gz"
-	local file="$name-$ver.$ext"
-
-	is_done $FUNCNAME && return 0
-
-	get "$GNU_MIRROR/$name/$file"
-	stage $file
-	mk_build_dir $FUNCNAME
-
-	# build
-	pushd "$BLD/$FUNCNAME"
-		$SRC/$name-$ver/configure $COMMON_FLAGS
-		make
-		make install
-		touch "$PRG/$FUNCNAME.done"
-	popd
-}
 
 BINUTILS_VERSION="2.24"
 
@@ -533,6 +511,9 @@ BASH_VERSION="4.3"
 
 tools_bash() {
 	generic_build "$FUNCNAME" "bash" "$BASH_VERSION" "tar.gz" "--without-bash-malloc"
+	install -d $LFS/bin
+	ln -sf $PREFIX/bin/bash $LFS/bin/sh
+	ln -sf $PREFIX/bin/bash $LFS/bin/bash
 }
 
 tools_vim() {
@@ -618,6 +599,139 @@ tools_nurses() {
 	popd
 }
 
+tools_zlib() {
+	local name="zlib"
+	local ver="1.2.8"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+	local flags=""
+
+	is_done $FUNCNAME && return 0
+
+	get "http://zlib.net/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$SRC/$name-$ver"
+		./configure --prefix=$PREFIX
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_git() {
+	local name="git"
+	local ver="2.1.3"
+	local ext="tar.xz"
+	local file="$name-$ver.$ext"
+	local flags=""
+
+	is_done $FUNCNAME && return 0
+
+	get "https://www.kernel.org/pub/software/scm/git/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$SRC/$name-$ver"
+		./configure $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+MAKE_VERSION="3.82"
+
+tools_make() {
+	local name="make"
+	local ver="$MAKE_VERSION"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_grep() {
+	local name="grep"
+	local ver="2.20"
+	local ext="tar.xz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_gawk() {
+	local name="gawk"
+	local ver="4.1.1"
+	local ext="tar.xz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_autoconf() {
+	local name="autoconf"
+	local ver="2.69"
+	local ext="tar.xz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+tools_filesystem() {
+	install -dv $LFS/{root,dev,proc,sys,etc,tmp,run}
+}
 
 for i in $SRC $BLD $TAR $PRG; do
 	if [[ ! -d $i ]]; then 
@@ -631,8 +745,6 @@ if [[ $1 == chroot ]]; then
 fi
 
 if [[ $1 == build ]]; then
-	#cross_sed
-	#cross_make
 	#native_compiler
 	stage1_binutils
 	stage1_gcc
@@ -646,8 +758,16 @@ if [[ $1 == build ]]; then
 	stage2_mpc
 	stage2_gcc
 	test_gcc
-	tools_coreutils
-	tools_nurses
-	tools_bash
-	tools_vim
+	#tools_coreutils
+	#tools_nurses
+	#tools_bash
+	#tools_vim
+	#tools_zlib
+	#tools_git
+	#tools_sed
+	#tools_make
+	#tools_grep
+	#tools_gawk
+	#tools_autoconf
+	tools_filesystem
 fi

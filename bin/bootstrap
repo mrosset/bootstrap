@@ -67,7 +67,7 @@ BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
-COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache -q"
+COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache"
 
 # Mirrors
 GNU_MIRROR="http://mirrors.kernel.org/gnu"
@@ -110,6 +110,31 @@ get() {
 	pushd "$TAR"
 		/usr/bin/wget -c "$1"
 	popd
+}
+
+# Generic function to build a simple /tools package
+generic_build() {
+	local func=$1
+	local name=$2
+	local version=$3
+	local ext=$4
+	local file="$name-$version.$ext"
+	local flags=$5
+
+	is_done $func && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $func
+
+	# build
+	pushd "$BLD/$func"
+		$SRC/$name-$version/configure $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$func.done"
+	popd
+
 }
 
 SED_VERSION="4.2.2"
@@ -507,20 +532,25 @@ stage2_gcc() {
 BASH_VERSION="4.3"
 
 tools_bash() {
-	local name="bash"
-	local ver="$BASH_VERSION"
-	local ext="tar.gz"
+	generic_build "$FUNCNAME" "bash" "$BASH_VERSION" "tar.gz" "--without-bash-malloc"
+}
+
+tools_vim() {
+	local name="vim"
+	local ver="7.4"
+	local ext="tar.bz2"
 	local file="$name-$ver.$ext"
+	local flags="--with-tlib=ncurses"
 
 	is_done $FUNCNAME && return 0
 
-	get "$GNU_MIRROR/$name/$file"
-	stage $file
+	get "ftp://ftp.vim.org/pub/vim/unix/vim-$ver.$ext"
+	[[ ! -d "$SRC/${name}74}" ]] && stage $file
 	mk_build_dir $FUNCNAME
 
 	# build
-	pushd "$BLD/$FUNCNAME"
-		$SRC/$name-$ver/configure $COMMON_FLAGS --prefix=$PREFIX -q
+	pushd "$SRC/${name}74"
+		LDFLAGS="-L/tools/lib" ./configure $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -561,6 +591,35 @@ tools_coreutils() {
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
+
+tools_nurses() {
+	local name="ncurses"
+	local ver="5.9"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+	local flags="\
+		--with-shared   \
+		--without-debug \
+		--without-ada   \
+		--enable-widec  \
+		--enable-overwrite"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS $flags
+		make
+		make install
+		touch "$PRG/$FUNCNAME.done"
+	popd
+}
+
+
 for i in $SRC $BLD $TAR $PRG; do
 	if [[ ! -d $i ]]; then 
 		mkdir -p -v $i
@@ -588,6 +647,8 @@ if [[ $1 == build ]]; then
 	stage2_mpc
 	stage2_gcc
 	test_gcc
-	tools_bash
 	tools_coreutils
+	tools_nurses
+	tools_bash
+	tools_vim
 fi

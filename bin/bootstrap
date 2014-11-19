@@ -67,7 +67,7 @@ BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
-COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache"
+COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache -q"
 
 # Mirrors
 GNU_MIRROR="http://mirrors.kernel.org/gnu"
@@ -540,7 +540,7 @@ tools_vim() {
 	local ver="7.4"
 	local ext="tar.bz2"
 	local file="$name-$ver.$ext"
-	local flags="--with-tlib=ncurses"
+	local flags="ac_cv_lib_ICE_IceConnectionNumber=no"
 
 	is_done $FUNCNAME && return 0
 
@@ -550,7 +550,7 @@ tools_vim() {
 
 	# build
 	pushd "$SRC/${name}74"
-		LDFLAGS="-L/tools/lib" ./configure $COMMON_FLAGS $flags
+		./configure $COMMON_FLAGS $flags
 		make
 		make install
 		touch "$PRG/$FUNCNAME.done"
@@ -601,7 +601,6 @@ tools_nurses() {
 		--with-shared   \
 		--without-debug \
 		--without-ada   \
-		--enable-widec  \
 		--enable-overwrite"
 
 	is_done $FUNCNAME && return 0

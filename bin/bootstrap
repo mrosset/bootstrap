@@ -442,10 +442,11 @@ stage1_libstdc++() {
 }
 
 test_gcc() {
-	echo 'main(){ return 0; }' > dummy.c
-	$LFS_TGT-gcc dummy.c
-	readelf -l a.out | grep ": $PREFIX"
-	./a.out
+	in=test/main.c
+	out=$(mktemp)
+	$LFS_TGT-gcc $in -o $out
+	readelf -l $out | grep ": $PREFIX"
+	rm $out
 	echo stage1 gcc ok
 	return 0
 }

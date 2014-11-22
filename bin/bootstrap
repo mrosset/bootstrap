@@ -36,10 +36,14 @@ export LIBTOOLFLAGS="--silent"
 LFS_TGT="x86_64-lfs-linux-gnu"
 #TARGET="arm-unknown-linux-gnueabi"
 #TARGET="i686-linux-gnu"
-LFS="/mnt/lfs"
-PREFIX="/tools"
+LFS="$HOME/root"
+PREFIX="$HOME/tools"
 
 export PATH=$HOME/bin:$PREFIX/bin:/bin:/usr/bin
+
+# create sysroot and link tools directory this is recursive
+mkdir -p $LFS/$PREFIX
+ln -fs $LFS/$PREFIX $PREFIX
 
 case $LFS_TGT in
 	arm*-*)
@@ -339,13 +343,13 @@ stage1_gcc() {
 			$(find gcc/config -name linux64.h -o -name linux.h -o -name sysv4.h)
 	do
 		cp -uv $file{,.orig}
-		sed -e 's@/lib\(64\)\?\(32\)\?/ld@/tools&@g' \
-			-e 's@/usr@/tools@g' $file.orig > $file
-		echo '
+		sed -e "s@/lib\(64\)\?\(32\)\?/ld@$PREFIX&@g" \
+			-e "s@/usr@$PREFIX@g" $file.orig > $file
+		echo "
 		#undef STANDARD_STARTFILE_PREFIX_1
 		#undef STANDARD_STARTFILE_PREFIX_2
-		#define STANDARD_STARTFILE_PREFIX_1 "/tools/lib/"
-		#define STANDARD_STARTFILE_PREFIX_2 ""' >> $file
+		#define STANDARD_STARTFILE_PREFIX_1 \"$PREFIX/lib/\"
+		#define STANDARD_STARTFILE_PREFIX_2 \"\"" >> $file
 		touch $file.orig
 	done
 	touch "$PRG/${FUNCNAME}_patch.done"
@@ -447,8 +451,6 @@ test_gcc() {
 	$LFS_TGT-gcc $in -o $out
 	readelf -l $out | grep ": $PREFIX"
 	rm $out
-	echo stage1 gcc ok
-	return 0
 }
 
 stage2_binutils() {
@@ -484,7 +486,7 @@ stage2_gcc() {
 		RANLIB=$LFS_TGT-ranlib                           \
 		--with-local-prefix=$PREFIX                      \
 		--with-native-system-header-dir=$PREFIX/include  \
-		--enable-languages=c,c++                         \
+		--enable-languages=c                             \
 		--disable-libstdcxx-pch                          \
 		--disable-multilib                               \
 		--disable-bootstrap                              \
@@ -761,7 +763,7 @@ if [[ $1 == build ]]; then
 	test_gcc
 	#tools_coreutils
 	#tools_nurses
-	#tools_bash
+	tools_bash
 	#tools_vim
 	#tools_zlib
 	#tools_git
@@ -770,5 +772,5 @@ if [[ $1 == build ]]; then
 	#tools_grep
 	#tools_gawk
 	#tools_autoconf
-	tools_filesystem
+	#tools_filesystem
 fi

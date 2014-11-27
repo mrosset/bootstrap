@@ -124,31 +124,6 @@ get() {
 	popd
 }
 
-# Generic function to build a simple /tools package
-generic_build() {
-	local func=$1
-	local name=$2
-	local version=$3
-	local ext=$4
-	local file="$name-$version.$ext"
-	local flags=$5
-
-	is_done $func && return 0
-
-	get "$GNU_MIRROR/$name/$file"
-	stage $file
-	mk_build_dir $func
-
-	# build
-	pushd "$BLD/$func"
-		$SRC/$name-$version/configure $COMMON_FLAGS $flags
-		make
-		make install
-		touch "$PRG/$func.done"
-	popd
-
-}
-
 SED_VERSION="4.2.2"
 
 tools_sed() {
@@ -804,10 +779,11 @@ if [[ $1 == build ]]; then
 	linux_headers
 	stage1_glibc
 	test_gcc
-	#stage1_libstdc++
-	#stage2_binutils
-	#stage2_gcc
-	#test_gcc 
+	stage1_libstdc++
+	stage2_binutils
+	stage2_gcc
+	strip_all
+	test_gcc 
 	)
 fi
 
@@ -817,13 +793,13 @@ if [[ $1 == tools ]]; then
 	tools_nurses
 	tools_bash
 	tools_vim
+	tools_sed
+	tools_make
+	tools_grep
+	tools_gawk
 	)
 	#tools_zlib
 	#tools_git
-	#tools_sed
-	#tools_make
-	#tools_grep
-	#tools_gawk
 	#tools_autoconf
 	#tools_filesystem
 fi

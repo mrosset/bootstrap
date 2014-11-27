@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 set -ehu
 
 xpwd=$PWD
@@ -9,8 +8,6 @@ term=$TERM
 home=$HOME
 
 unset $(env | awk -F= '/^\w/ {print $1}' | xargs)
-
-
 
 # enviroment
 export HOME=$home
@@ -103,6 +100,7 @@ mk_build_dir() {
 }
 
 stage() {
+	local file=$1
 	local dir="${file%.*.*}"
 	[[ -d $SRC/$dir ]] && return 0 
 	echo "staging $1"
@@ -333,10 +331,22 @@ stage1_gcc() {
 	is_done $FUNCNAME && return 0
 
 	get "$GNU_MIRROR/$name/$name-$version/$file"
+	get "$GNU_MIRROR/mpfr/mpfr-3.1.2.tar.xz"
+	get "$GNU_MIRROR/gmp/gmp-6.0.0a.tar.xz"
+	get "$GNU_MIRROR/mpc/mpc-1.0.2.tar.gz"
+
 	stage $file
+	stage mpfr-3.1.2.tar.xz
+	stage gmp-6.0.0a.tar.xz
+	stage mpc-1.0.2.tar.gz
+
 	mk_build_dir $FUNCNAME
 
 	pushd "$SRC/$name-$version"
+	ln -sf ../gmp-6.0.0  gmp
+	ln -sf ../mpc-$MPC_VERSION  mpc
+	ln -sf ../mpfr-$MPFR_VERSION mpfr
+
 	if [[ ! -f $PRG/${FUNCNAME}_patch ]]; then
 		sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure
 		for file in \
@@ -756,14 +766,11 @@ if [[ $1 == build ]]; then
 	test_gcc
 	stage1_libstdc++
 	stage2_binutils
-	stage2_gmp
-	stage2_mpfr
-	stage2_mpc
 	stage2_gcc
 	test_gcc
 	#tools_coreutils
 	#tools_nurses
-	tools_bash
+	#tools_bash
 	#tools_vim
 	#tools_zlib
 	#tools_git

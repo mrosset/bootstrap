@@ -36,6 +36,9 @@ LFS_TGT="x86_64-lfs-linux-gnu"
 LFS="$HOME/root"
 PREFIX="$HOME/tools"
 
+# strip
+INSTALL="install-strip"
+
 export PATH=$HOME/bin:$PREFIX/bin:/bin:/usr/bin
 
 # create sysroot and link tools directory this is recursive
@@ -68,14 +71,20 @@ BLD="$BOOTSTRAP/bld"
 TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
-COMMON_FLAGS="--prefix=$PREFIX --disable-bootstrap --config-cache -q"
+COMMON_FLAGS="
+	--prefix=$PREFIX 
+	--disable-bootstrap 
+	--disable-manpages
+	--disable-nls
+	--without-manpages
+	--config-cache -q"
 
 # Mirrors
 GNU_MIRROR="http://mirrors.kernel.org/gnu"
 
 
 lfs_chroot() {
-	sudo arch-chroot "$LFS" $PREFIX/bin/env -i \
+	sudo chroot "$LFS" $PREFIX/bin/env -i \
 		EDITOR=vim                  \
 		HOME=/root                  \
 		TERM="$TERM"                \
@@ -523,10 +532,27 @@ stage2_gcc() {
 BASH_VERSION="4.3"
 
 tools_bash() {
-	generic_build "$FUNCNAME" "bash" "$BASH_VERSION" "tar.gz" "--without-bash-malloc"
-	install -d $LFS/bin
-	ln -sf $PREFIX/bin/bash $LFS/bin/sh
-	ln -sf $PREFIX/bin/bash $LFS/bin/bash
+	local name="bash"
+	local ver="$BASH_VERSION"
+	local ext="tar.gz"
+	local file="$name-$ver.$ext"
+
+	is_done $FUNCNAME && return 0
+
+	get "$GNU_MIRROR/$name/$file"
+	stage $file
+	mk_build_dir $FUNCNAME
+
+	# build
+	pushd "$BLD/$FUNCNAME"
+		$SRC/$name-$ver/configure $COMMON_FLAGS
+		make
+		make install
+		install -d $LFS/bin
+		ln -sf $PREFIX/bin/bash $LFS/bin/sh
+		ln -sf $PREFIX/bin/bash $LFS/bin/bash
+		touch "$PRG/$FUNCNAME.done"
+	popd
 }
 
 tools_vim() {
@@ -547,6 +573,7 @@ tools_vim() {
 		./configure $COMMON_FLAGS $flags
 		make
 		make install
+		ln -s vim $PREFIX/bin/vi
 		touch "$PRG/$FUNCNAME.done"
 	popd
 }
@@ -742,8 +769,20 @@ tools_autoconf() {
 	popd
 }
 
+strip_all() {
+	strip $PREFIX/libexec/gcc/*/$GCC_VERSION/* || true
+	strip $PREFIX/lib/* || true
+	strip $PREFIX/{,s}bin/* || true
+}
+
+
 tools_filesystem() {
 	install -dv $LFS/{root,dev,proc,sys,etc,tmp,run}
+}
+
+tarball() {
+	strip_all
+	tar vcJ $LFS $PREFIX -f $BOOTSTRAP/root-master.tar.xz
 }
 
 for i in $SRC $BLD $TAR $PRG; do
@@ -759,6 +798,7 @@ fi
 
 if [[ $1 == build ]]; then
 	#native_compiler
+	time(
 	stage1_binutils
 	stage1_gcc
 	linux_headers
@@ -767,11 +807,17 @@ if [[ $1 == build ]]; then
 	stage1_libstdc++
 	stage2_binutils
 	stage2_gcc
-	test_gcc
-	#tools_coreutils
-	#tools_nurses
-	#tools_bash
-	#tools_vim
+	test_gcc 
+	)
+fi
+
+if [[ $1 == tools ]]; then
+	time(
+	tools_coreutils
+	tools_nurses
+	tools_bash
+	tools_vim
+	)
 	#tools_zlib
 	#tools_git
 	#tools_sed
@@ -780,4 +826,8 @@ if [[ $1 == build ]]; then
 	#tools_gawk
 	#tools_autoconf
 	#tools_filesystem
+fi
+
+if [[ $1 == tarball ]]; then
+	time tarball
 fi

@@ -771,8 +771,8 @@ tools_autoconf() {
 
 strip_all() {
 	strip $PREFIX/libexec/gcc/*/$GCC_VERSION/* || true
-	strip $PREFIX/lib/* || true
-	strip $PREFIX/{,s}bin/* || true
+	strip --strip-debug $PREFIX/lib/* || true
+	strip --strip-unneeded $PREFIX/{,s}bin/* || true
 }
 
 
@@ -804,10 +804,10 @@ if [[ $1 == build ]]; then
 	linux_headers
 	stage1_glibc
 	test_gcc
-	stage1_libstdc++
-	stage2_binutils
-	stage2_gcc
-	test_gcc 
+	#stage1_libstdc++
+	#stage2_binutils
+	#stage2_gcc
+	#test_gcc 
 	)
 fi
 

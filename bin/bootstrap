@@ -535,7 +535,7 @@ tools_bash() {
 	mk_build_dir $FUNCNAME
 
 	# build
-	pushd "$BLD/$FUNCNAME"
+	pushd "$SRC/$name-$ver"
 		$SRC/$name-$ver/configure $COMMON_FLAGS
 		make
 		make install
@@ -773,7 +773,7 @@ tools_filesystem() {
 
 tarball() {
 	strip_all
-	tar vcJ $LFS $PREFIX -f $BOOTSTRAP/root-master.tar.xz
+	tar vcJ $LFS $PREFIX -f $BOOTSTRAP/root-$LFS_TGT.tar.xz
 }
 
 for i in $SRC $BLD $TAR $PRG; do

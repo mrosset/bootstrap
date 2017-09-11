@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #   bootstrap creates a LFS self hosting toolchain
-#   Copyright (C) 2014 Michael Rosset 
+#   Copyright (C) 2014 Michael Rosset
 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -88,8 +88,8 @@ TAR="$BOOTSTRAP/tar"
 PRG="$BOOTSTRAP/prg"
 
 COMMON_FLAGS="
-	--prefix=$PREFIX 
-	--disable-bootstrap 
+	--prefix=$PREFIX
+	--disable-bootstrap
 	--disable-manpages
 	--disable-nls
 	--without-manpages
@@ -127,7 +127,7 @@ mk_build_dir() {
 stage() {
 	local file=$1
 	local dir="${file%.*.*}"
-	[[ -d $SRC/$dir ]] && return 0 
+	[[ -d $SRC/$dir ]] && return 0
 	echo "staging $1"
 	tar xf "$TAR/$1" -C "$SRC"
 	return 0
@@ -210,7 +210,7 @@ stage1_binutils() {
 		--target=$LFS_TGT          \
 		--disable-nls              \
 		--disable-werror"
-	
+
 	is_done $FUNCNAME && return 0
 
 	get "$GNU_MIRROR/$name/$file"
@@ -577,7 +577,7 @@ tools_toybox() {
 	install -d "$PREFIX/usr/bin"
 	install -d "$PREFIX/usr/sbin"
 	install $TAR/$file $PREFIX/bin/toybox
-	for i in $($PREFIX/bin/toybox --long); do 
+	for i in $($PREFIX/bin/toybox --long); do
 		ln -sfv "$PREFIX/bin/toybox" "$PREFIX/$i"
 	done
 	touch "$PRG/$FUNCNAME.done"
@@ -783,7 +783,7 @@ tarball() {
 }
 
 for i in $SRC $BLD $TAR $PRG; do
-	if [[ ! -d $i ]]; then 
+	if [[ ! -d $i ]]; then
 		mkdir -p -v $i
 	fi
 done
@@ -804,7 +804,7 @@ if [[ $1 == build ]]; then
 	stage1_libstdc++
 	stage2_binutils
 	stage2_gcc
-	test_gcc 
+	test_gcc
 	tools_filesystem
 	)
 fi

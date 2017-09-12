@@ -2,3 +2,5 @@ src
 tar
 prg
 bld
+/docker/root
+/root-x86_64-lfs-linux-gnu.tar.xz

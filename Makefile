@@ -25,7 +25,7 @@ docker/root:
 docker/bin/via: $(GOPATH)/bin/via
 	cp $(GOPATH)/bin/via docker/bin/
 
-docker: docker/Dockerfile docker/bin/via
+docker: docker/Dockerfile
 	docker build -t $(DREPO) docker
 	touch $@
 

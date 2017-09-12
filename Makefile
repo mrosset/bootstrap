@@ -1,3 +1,9 @@
+DREPO   = strings/lfs:devel
+TARBALL = root-x86_64-lfs-linux-gnu.tar.xz
+export CGO_ENABLED=0
+
+default: attach
+
 build:
 	bin/bootstrap build
 
@@ -10,21 +16,22 @@ clean:
 tarball:
 	bin/bootstrap tarball
 
-.PHONY: docker
-
-root-x86_64-lfs-linux-gnu.tar.xz: tarball
+$(TARBALL): tarball
 
 docker/root:
 	mkdir -v docker/root
-	tar xf root-x86_64-lfs-linux-gnu.tar.xz -C docker/root
+	tar xf $(TARBALL) -C docker/root
 
-docker: docker/Dockerfile docker/root
-	docker build -t strings/lfs:devel docker
+docker/bin/via: $(GOPATH)/bin/via
+	cp $(GOPATH)/bin/via docker/bin/
+
+docker: docker/Dockerfile docker/bin/via
+	docker build -t $(DREPO) docker
+	touch $@
 
 start:
 	-docker rm -f lfs
-	docker run --name lfs -it -e TERM=$(TERM) strings/lfs:devel /bin/bash
+	docker run --name lfs -it -d -e TERM=$(TERM) -v /home:/home -v cache:$(HOME)/.cache $(DREPO) /bin/sh --noprofile
 
-elf: docker/tools
-	ls docker/tools/bin/size
-	readelf -l docker/tools/bin/size
+attach: docker start
+	docker container attach lfs
